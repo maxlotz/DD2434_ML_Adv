@@ -37,7 +37,9 @@ def gauss_print(mu,cov):
 	# grid and W_graph are global
     gauss = stats.multivariate_normal.pdf(grid, mu, cov)
     gauss = np.reshape(gauss,(len(W_graph),-1))
-    plt.imshow(gauss)
+    plt.imshow(gauss,origin="lower",aspect='auto',extent=(xv.min(),xv.max(),yv.min(),yv.max()))
+    plt.xlabel('w0')
+    plt.ylabel('w1')
     plt.show()
 
 def compute_posterior(X, Y, prior_mu, prior_cov):
