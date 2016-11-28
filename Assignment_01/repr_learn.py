@@ -4,7 +4,7 @@ import math
 import  scipy  as sp
 import  scipy.optimize  as opt
 
-sig = 2.0
+sig = 1.0
 #Wtest = np.random.randn(20)
 X = np.linspace(0.0, 4.0*np.pi, 100)
 

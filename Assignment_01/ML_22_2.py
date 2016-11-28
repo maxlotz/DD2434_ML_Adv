@@ -58,7 +58,8 @@ def compute_posterior(X, Y, prior_mu, prior_cov):
 mu = W_mu
 covar = W_cov
 idx = []
-for i in range(100):
+iters = 200
+for i in range(iters):
 	num = randint(0,Xlen-1)
 	X1 = X[num,:]
 	X1 = np.reshape(X1,(1,-1))
@@ -67,15 +68,58 @@ for i in range(100):
 	mu, covar = compute_posterior(X1, Y1, mu, covar)
 	idx.append(num)
 
+samples = 20
+meh = np.random.multivariate_normal([mu[0,0],mu[1,0]], covar, samples)
+
 print mu
 print covar
 
-Y_nonoise = np.dot(X,mu)
+Y_nonoise = np.dot(X,np.transpose(meh))
+print Y_nonoise.shape
 
-plt.plot(X[idx,0], Y[idx,0], 'ro')
-plt.plot(X[idx,0], Y_nonoise[idx,0])
-plt.axis([-1.0, 1.0, -3, 4])
+for i in range(samples):
+    plt.plot(X[idx,0], Y[idx,0], 'ro')
+    plt.plot(X[idx,0], Y_nonoise[idx,i])
 plt.figure()
 
+#gauss_print([0,0], W_cov)
 gauss_print([mu[0,0],mu[1,0]], covar)
 plt.show()
+
+'''
+2
+[[-0.5784796 ]
+ [ 0.64531596]]
+[[ 0.24927986  0.03822291]
+ [ 0.03822291  0.10586085]]
+
+5
+[[-0.64181909]
+ [ 0.54993004]]
+[[ 0.12468137 -0.0004156 ]
+ [-0.0004156   0.05000139]]
+
+10
+[[-1.09485533]
+ [ 0.37802301]]
+[[ 0.09910743  0.0155869 ]
+ [ 0.0155869   0.02972412]]
+
+20
+[[-0.91297265]
+ [ 0.22890443]]
+[[ 0.03624985 -0.00070774]
+ [-0.00070774  0.01429953]]
+
+50
+[[-1.19972353]
+ [ 0.48109014]]
+[[ 0.01760391 -0.00025888]
+ [-0.00025888  0.00588616]]
+
+200
+[[-1.26501747]
+ [ 0.42958491]]
+[[ 0.00400277 -0.00021906]
+ [-0.00021906  0.00150453]]
+'''

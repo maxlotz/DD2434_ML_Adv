@@ -4,7 +4,7 @@ import math
 from scipy.spatial.distance import cdist, pdist
 
 # Generate data
-l = 2.0
+l = 1.5
 sigma = 1.0
 cardinality = 7
 noise_sigma = 0.5
@@ -42,14 +42,17 @@ def plot_sample_prior(scale):
 	plt.title(title)
 	plt.show()
 
-def plot_sample_posterior(mu, sig):
-	samples = 1
+def plot_samples_posterior(mu, sig):
+	samples = 5
 	mu = np.reshape(mu,(x_s_len,))
 	Z = np.random.multivariate_normal(mu,np.nan_to_num(sig),samples)
 	plt.figure()
 	plt.plot(X,Y,'ro')
 	for i in range(samples):
 		plt.plot(x_s[:],Z[i,:])
+	plt.plot(x_s[:],mu[:],color="black",linewidth=2)
+	title = 'length-scale '+str(l)
+	plt.title(title)
 	plt.show()
 
 def plot_posterior(mu, sig):
@@ -63,8 +66,10 @@ def plot_posterior(mu, sig):
     lower = mu - 2*sig_vec
     ax = plt.gca()
     ax.fill_between(xs, upper, lower, facecolor='pink', interpolate=True, alpha=0.1)
+    title = 'length-scale '+str(l)
+    plt.title(title)
     plt.show()
 
 mu, sig = compute_posterior(l)
 
-plot_posterior(mu, sig)
+plot_posterior(mu,sig)
