@@ -41,12 +41,12 @@ def samplePlayerDice(playerDice, tables):
     return(sequence)
 
 def demo(nTables, primed, unPrimed, playerDice):
-
     tables = generateTables(nTables, 0.5)
+    #print tables
     tableOutcome = np.asarray(sampleTableDice(primed, unPrimed, tables))
     playerOutcome = np.asarray(samplePlayerDice(playerDice, tables))
-    sum = tableOutcome + playerOutcome
-    return sum
+    sum_ = tableOutcome + playerOutcome
+    return sum_, tables
 
 def DiceHist():
 	nTables = 10
@@ -65,7 +65,7 @@ def DiceHist():
 	iters = 10000
 	hist = []
 	for i in range(iters):
-	    obs = demo(nTables, primed, unPrimed, playerDice)
+	    obs, _ = demo(nTables, primed, unPrimed, playerDice)
 	    hist = np.append(hist, obs)
 
 	H = np.diff(np.unique(hist)).min()
@@ -74,72 +74,62 @@ def DiceHist():
 	plt.hist(hist, np.arange(left_of_first_bin, right_of_last_bin + H, H))
 	plt.show()
 
-# compute alpha given a sequence of observations and the parameters of the model
-# primed: distribution of the dice in the primed tables
-# unprimed: distribution of the dice in the unprimed tables
-# playerDice : distribution of the player's dice
-# A: transition matrix (for the states)
-# pi: intial state distribution
-def SampleFromPosterior(obs, primed, unPrimed, playerDice, pi, A):
-    #number of states
-    states = np.size(A[0,:])
-    observations = len(obs)
-    #table of alphas
-    alpha = np.zeros((observations,states))
-    #alpha(timestep, state)
-    for i in range(states):
-        alpha[0][i] = pi[i]*computeB(obs[0],0,i,primed, unPrimed,playerDice)
+def Viterbi(A,B,PI,O):
+	T = O.shape[0]
+	N = A.shape[0]
+	M = B.shape[1]
 
-    for k in range(1,observations):
-        for i in range(states):
-            for j in range(states):
-                alpha[k][i] += alpha[k-1][j]*A[j][i]*computeB(obs[k],k,i, primed, unPrimed, playerDice)
-    norm = 0
-    for i in range(states):
-        norm += alpha[observations-1][i]
-    prob1 = alpha[observations-1][1]/norm
-    #prob0 = alpha[observations-1][0]/norm
-    #print("prob 0",prob0)
-    #print("prob 1", prob1)
-    zk = np.random.binomial(1,prob1)
-    stateSequence = []
-    for i in reversed(range(observations-1)):
-        zkPrev = []
-        for previous in range(states):
-            zkPrev.append(A[previous][zk]*alpha[i][previous])
-        factor = 0
-        for i in range(states):
-            factor += zkPrev[i]
-        probZkPrev = zkPrev[1]/factor
-        stateSequence.append(np.random.binomial(1,probZkPrev))
+	delta = np.zeros((T,N))
+	deltaidx = np.zeros((T-1,N))
+	maxO = np.zeros(T)
 
-    #in the order of the observations
-    stateSequence = stateSequence[::-1]
-    stateSequence.append(zk)
-    return stateSequence
+	delta[0,:] = np.log(PI*np.transpose(B[:,O[0]]))
 
+	for t in range(T-1):
+		for i in range(N):
+			p1 = np.zeros(N)
+			for j in range(N):
+				p1[j] = delta[t,j] + np.log(A[j,i]) + np.log(B[i,O[t+1]])
+			delta[t+1,i] = p1.max()
+			deltaidx[t,i] = np.argmax(p1)
+
+	maxO[T-1] = np.argmax(delta[T-1,:])
+
+	for t in range(T-1):
+		maxO[T-t-2] = deltaidx[T-t-2,maxO[T-t-1]]
+
+	return maxO
 
 def CreateMatrices(primed, unPrimed, playerDice):
 	primed = primed[:,None]
 	unPrimed = unPrimed[:,None]
 	playerDice = playerDice[:,None]
 
-	PI =  np.ones((2))/2.0
+	PI =  np.ones((1,2))/2.0
 
 	A = np.matrix([[1./4,3./4],[3./4,1./4]])
 
 	B = np.zeros((2,11))
 	m1 = np.fliplr(np.dot(playerDice,np.transpose(unPrimed)))
 	m2 = np.fliplr(np.dot(playerDice,np.transpose(primed)))
-	print m1
-	print m2
 	for i in range(11):
 		B[0,i] = sum(np.diag(m1,5-i)) 
 		B[1,i] = sum(np.diag(m2,5-i))
 
 	return A, B, PI
 
-primed = np.ones(6)*1./10
-primed[5] = 1./2
-playerDice = np.ones(6)*1.0/6
-unPrimed = np.ones(6)*1.0/6
+def PrintViterbi():
+	Primed = np.ones(6)*1./10
+	Primed[5] = 1./2
+	PlayerDice = np.ones(6)*1.0/6
+	UnPrimed = np.ones(6)*1.0/6
+
+	nTables = 20
+	A_, B_, PI_ = CreateMatrices(Primed, UnPrimed, PlayerDice)
+	O_, tables = demo(nTables, Primed, UnPrimed, PlayerDice) # Observation is from 2 to 12, indexed as 0 to 10
+	max_tables = Viterbi(A_,B_,PI_,O_-2)
+	print O_
+	print np.array(tables)
+	print max_tables.astype(int)
+
+PrintViterbi()
