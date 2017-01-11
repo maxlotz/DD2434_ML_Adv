@@ -62,7 +62,7 @@ def random_noise(image, prob):
 
 
 def normalize(dataset):  # normalizes data 0 -> 1
-    return (dataset - min(dataset)) / (max(dataset) - min(dataset))
+    return dataset - np.mean(dataset,0)
 
 # modified from http://sebastianraschka.com/Articles/2014_kernel_pca.html
 def kpca(dataset, gamma, n_components=256):
@@ -93,8 +93,10 @@ def kpca(dataset, gamma, n_components=256):
 
 dataset = fetch_mldata('usps', data_home=datapath)  # Save dataset at path (long download)
 X, y = dataset.data, dataset.target.astype(np.int)
+X = normalize(X)
 
+#Cant use full dataset, takes too long
 vecs = kpca(X[:300,:], 0.5)
-print vecs.shape
+show(vecs[0])
 
 
