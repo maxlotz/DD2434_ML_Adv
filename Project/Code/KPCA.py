@@ -13,8 +13,7 @@ import sys
 
 # Author: Sebastian Leborg
 
-#navigate to where you want to save the dataset in the terminal then type 'pwd' to print the working directory
-datapath = '/afs/kth.se/home/m/a/maxlotz/Desktop/DD2434_ML_Adv/Project'
+datapath = 'datasets/'
 
 def show(image):  # plots an image
     if len(image) == 256:
