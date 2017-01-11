@@ -66,8 +66,7 @@ def normalize(dataset):  # normalizes data 0 -> 1
 
 # modified from http://sebastianraschka.com/Articles/2014_kernel_pca.html
 def kpca(dataset, gamma, n_components=256):
-
-    N, M = dataset.shape
+    dataset = normalize(dataset)
 
     # Calculating the squared Euclidean distances for every pair of points
     sq_dists = pdist(dataset, 'sqeuclidean')
@@ -79,8 +78,8 @@ def kpca(dataset, gamma, n_components=256):
     K = exp(-mat_sq_dists/gamma) # possibly gamma*N instead of just gamma
 
     # Centering the symmetric NxN kernel matrix.
-    one_n = np.ones((N,N)) / N
-    K = K - one_n.dot(K) - K.dot(one_n) + one_n.dot(K).dot(one_n)
+    kern_cent = KernelCenterer()
+    K = kern_cent.fit_transform(K)
 
     # Obtaining eigenvalues in descending order with corresponding eigenvectors
     eigvals, eigvecs = eigh(K)
@@ -88,15 +87,21 @@ def kpca(dataset, gamma, n_components=256):
     # Obtaining the i eigenvectors that corresponds to the i highest eigenvalues.
     X_pc = np.column_stack((eigvecs[:,-i] for i in range(1,n_components+1)))
 
-    return X_pc
+    return X_pc # shape: no of datapoints x n_components
 
+def pca(dataset, n_components=256):
+    dataset = normalize(dataset)
+    C = np.cov(dataset, rowvar=False)
+    eigvals, eigvecs = eigh(C)
+    X_pc = np.column_stack((eigvecs[:,-i] for i in range(1,n_components+1)))
 
-dataset = fetch_mldata('usps', data_home=datapath)  # Save dataset at path (long download)
+    return X_pc # shape: 256 x n_components
+
+dataset = fetch_mldata('usps', data_home=datapath)  # Save dataset at path (19.1Mb)
 X, y = dataset.data, dataset.target.astype(np.int)
-X = normalize(X)
 
-#Cant use full dataset, takes too long
-vecs = kpca(X[:300,:], 0.5)
-show(vecs[0])
+test = pca(X)
+show(test[:,10])
+
 
 
