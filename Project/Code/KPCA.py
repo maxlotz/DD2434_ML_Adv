@@ -65,7 +65,17 @@ def normalize(dataset):  # normalizes data 0 -> 1
     return dataset - np.mean(dataset,0)
 
 # modified from http://sebastianraschka.com/Articles/2014_kernel_pca.html
-def kpca(dataset, gamma, n_components=256):
+def kPCA(dataset, C, n_components=256):
+    '''
+    inputs:
+        dataset: the dataset, shape (M x N). Each data point is a row, each dimension is a column.
+        C: constant, 2 * (standard deviation**2)
+        n_components: number of PCA eigenvectors to be used to reconstruct data
+
+    outputs:
+        Y = data projected onto normalized eigenvectors
+    '''
+
     dataset = normalize(dataset)
 
     # Calculating the squared Euclidean distances for every pair of points
@@ -75,21 +85,25 @@ def kpca(dataset, gamma, n_components=256):
     mat_sq_dists = squareform(sq_dists)
 
     # Computing the MxM kernel matrix.
-    K = exp(-mat_sq_dists/gamma) # possibly gamma*N instead of just gamma
+    K = exp(-mat_sq_dists/C) # possibly C*N instead of just C
 
     # Centering the symmetric NxN kernel matrix.
-    kern_cent = KernelCenterer()
-    K = kern_cent.fit_transform(K)
+    N = K.shape[0]
+    one_n = np.ones((N,N)) / N
+    K = K - one_n.dot(K) - K.dot(one_n) + one_n.dot(K).dot(one_n)
 
     # Obtaining eigenvalues in descending order with corresponding eigenvectors
+    # This is already normalized
     eigvals, eigvecs = eigh(K)
 
     # Obtaining the i eigenvectors that corresponds to the i highest eigenvalues.
-    X_pc = np.column_stack((eigvecs[:,-i] for i in range(1,n_components+1)))
+    eigvecs = np.column_stack((eigvecs[:,-i] for i in range(1,n_components+1)))
 
-    return X_pc # shape: no of datapoints x n_components
+    Y = np.dot(K,eigvecs)
 
-def pca(dataset, n_components=256):
+    return Y, eigvecs
+
+def PCA(dataset, n_components=256):
     dataset = normalize(dataset)
     C = np.cov(dataset, rowvar=False)
     eigvals, eigvecs = eigh(C)
@@ -97,11 +111,35 @@ def pca(dataset, n_components=256):
 
     return X_pc # shape: 256 x n_components
 
+def kPCA_PreImage(y,eigVector,dataset,C):
+    # Finds preimage for one piece of data
+    iters = 1000;
+    N = dataset.shape[0]
+    d = np.max(y.shape);
+
+    gamma = np.dot(eigvecs,y)
+    gamma = gamma[:,None].T
+
+    z = np.mean(dataset,0)
+
+    for count in range(iters):
+        pre_z = z
+        xx = -((z - dataset)**2)/C
+        xx = np.exp(xx)
+        num = np.dot(gamma,xx)
+        den = xx*dataset
+        z = np.sum(num,0)/np.sum(den,0)
+        convergence = np.linalg.norm(pre_z - z)/np.linalg.norm(z)
+        print convergence
+
+    return z
+
 dataset = fetch_mldata('usps', data_home=datapath)  # Save dataset at path (19.1Mb)
 X, y = dataset.data, dataset.target.astype(np.int)
+C = 1.0
 
-test = pca(X)
-show(test[:,10])
+X = X[:300,:]
+Y, eigvecs = kPCA(X,0.5)
+Y_ = Y[0,:]
 
-
-
+z = kPCA_PreImage(Y_,eigvecs,X,C)
