@@ -74,7 +74,7 @@ def PCA(dataset, n_components=20):
 def kPCA(dataset, c, n_components=20):
 	''' Performs kPCA
 	inputs:
-		dataset: the dataset, shape (M x N). Each data point is a row, each dimension is a column.
+		dataset: the dataset, shape (l x D). Each data point is a row, each dimension is a column.
 		c: constant, 2 * (standard deviation**2)
 		n_components: number of PCA eigenvectors to be used to reconstruct data
 	outputs:
@@ -90,7 +90,7 @@ def kPCA(dataset, c, n_components=20):
 	mat_sq_dists = squareform(sq_dists)
 
 	# Computing the MxM kernel matrix.
-	K = exp(-mat_sq_dists/c) # possibly C*N instead of just C
+	K = exp(-mat_sq_dists/c)
 
 	# Centering the symmetric NxN kernel matrix.
 	N = K.shape[0]
@@ -113,12 +113,12 @@ def kPCA(dataset, c, n_components=20):
 def projection(dataset, datapoint, c, alphas):
 	''' Projects as SINGLE datapoint onto given eigenvectors
 	inputs:
-		dataset: the dataset, shape (M x N). Each data point is a row, each dimension is a column.
+		dataset: the dataset, shape (l x n). Each data point is a row, each dimension is a column.
 		datapoint: the test point we wish to project on our eigenvectors
 		c: constant, 2 * (standard deviation**2)
-		alphas: Our matrix of eigenvectors, shape (M x d), where the top d eigenvectors have been chosen.
+		alphas: Our matrix of eigenvectors, shape (l x n), where the top d eigenvectors have been chosen.
 	outputs:
-		Beta = data projected onto eigenvectors
+		Beta = data projected onto eigenvectors (n x 1)
 	'''
 	l, n = alphas.shape
 	
@@ -134,38 +134,35 @@ def projection(dataset, datapoint, c, alphas):
 def kPCA_PreImage(beta,alphas,dataset,c, z_start):
 	''' Finds preimage for ONE single data points
 	inputs:
-		beta: a single column vector data point projected onto the eigenvectors obtained from kPCA
-		alphas: Matrix containing the eigenvectors obtained from kPCA
-		dataset: the dataset, shape (M x N). Each data point is a row, each dimension is a column.
+		beta: a single column vector data point projected onto the eigenvectors obtained from kPCA (n x 1)
+		alphas: Matrix containing the eigenvectors obtained from kPCA (l x n)
+		dataset: the dataset, shape (l x D). Each data point is a row, each dimension is a column.
 		c: constant, 2 * (standard deviation**2)
 	outputs:
 		z = preimage, shape (256,)
 	'''
 	iters = 1000
 		
-	gamma = np.dot(alphas,beta) # shape (N x 1)
-	N = gamma.shape[0]
 	num = 0
 	den = 0
 	z = z_start
+	gamma = np.dot(alphas,beta) # shape (l x 1)
+	N = gamma.shape[0]
 
-	pre_z = z
-	for i in range(N):
-		val = gamma[i]*np.exp(-sum((z - dataset[i,:])**2)/c)
-		num += val
-		den += val*dataset[i,:]
-	z=num/den
-
-	#Silviu's code
-	num_ = 0
-	den_ = 0
-	for i in range(N):
-		num_ = num_ + gamma[i]*np.exp(-np.linalg.norm(z-dataset[i,:])**2/c)*dataset[i,:]
-		den_ = den_ + gamma[i]*np.exp(-np.linalg.norm(z-dataset[i,:])**2/c)
-	z_= num_/den_
-
-	print z[:10]
-	print z_[:10]
+	for it in range(iters):
+		pre_z = z
+		for i in range(N):
+			val = gamma[0]*np.exp(-sum((z - dataset[0,:])**2)/c)
+			den += val
+			num += val*dataset[0,:]
+		z = num/den
+		convergence = np.linalg.norm(pre_z - z)/np.linalg.norm(z)
+		print "convergence: " + str(convergence)
+		if convergence<0.000000001:
+			break
+	
+	return z
+	
 
 
 # GET DATA, CREATE TRAIN AND TEST SETS
@@ -180,21 +177,21 @@ X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.15)
 X_test = speckle_noise(X_test, 0.1)
 
 # SET PARAMS HERE
-prob = 0.1 # probability of noise generated
-n_comps = 10 # the number of components
+prob = 0.3 # probability of noise generated
+n_comps = 1 # the number of components
 C = 0.5 # gaussian kernel param, largely affects result
-C = N*C
+C = N*C/10
 n = 1 # pick a specific datapoint
 
 # ALGORITHM RUNS HERE. Performs kPCA, gets the eigenvalues and the projected data, then computes the pre-image for the chosen data point.
 test_point = X_test[n,:]
 Alphas = kPCA(X_train,C,n_comps)
 Beta = projection(X_train, test_point, C, Alphas)
-kPCA_PreImage(Beta, Alphas, X_train, C, test_point)
+z = kPCA_PreImage(Beta, Alphas, X_train, C, test_point)
 
 # Show results
-#show(test_point)
-#show(z)
+show(test_point)
+show(z)
 
 
 '''
