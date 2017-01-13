@@ -131,7 +131,7 @@ def projection(dataset, datapoint, c, alphas):
 
 	return betas
 
-def kPCA_PreImage(beta,alphas,dataset,c):
+def kPCA_PreImage(beta,alphas,dataset,c, z_start):
 	''' Finds preimage for ONE single data points
 	inputs:
 		beta: a single column vector data point projected onto the eigenvectors obtained from kPCA
@@ -141,25 +141,32 @@ def kPCA_PreImage(beta,alphas,dataset,c):
 	outputs:
 		z = preimage, shape (256,)
 	'''
-	iters = 1000;
-
-	gamma = np.dot(beta,alphas.T).T # shape (N x 1)
-
-	z = np.mean(dataset,0)
-
+	iters = 1000
+		
+	gamma = np.dot(alphas,beta) # shape (N x 1)
+	N = gamma.shape[0]
 	num = 0
 	den = 0
-	for count in range(iters):
-		pre_z = z
-		for i in range(gamma.shape[0]):
-			num = num + gamma[i]*np.exp(-np.linalg.norm(z-dataset[i,:])**2/c)*dataset[i,:]
-			den = den + gamma[i]*np.exp(-np.linalg.norm(z-dataset[i,:])**2/c)
-		z+= num/den
-		convergence = np.linalg.norm(pre_z - z)/np.linalg.norm(z)
-		print "convergence: " + str(convergence)
-		if convergence<0.000000001:
-			break
-	return z
+	z = z_start
+
+	pre_z = z
+	for i in range(N):
+		val = gamma[i]*np.exp(-sum((z - dataset[i,:])**2)/c)
+		num += val
+		den += val*dataset[i,:]
+	z=num/den
+
+	#Silviu's code
+	num_ = 0
+	den_ = 0
+	for i in range(N):
+		num_ = num_ + gamma[i]*np.exp(-np.linalg.norm(z-dataset[i,:])**2/c)*dataset[i,:]
+		den_ = den_ + gamma[i]*np.exp(-np.linalg.norm(z-dataset[i,:])**2/c)
+	z_= num_/den_
+
+	print z[:10]
+	print z_[:10]
+
 
 # GET DATA, CREATE TRAIN AND TEST SETS
 dataset = fetch_mldata('usps', data_home=datapath)  # Save dataset at path (19.1Mb)
@@ -182,13 +189,14 @@ n = 1 # pick a specific datapoint
 # ALGORITHM RUNS HERE. Performs kPCA, gets the eigenvalues and the projected data, then computes the pre-image for the chosen data point.
 test_point = X_test[n,:]
 Alphas = kPCA(X_train,C,n_comps)
-print Alphas[:5,:5]
 Beta = projection(X_train, test_point, C, Alphas)
-z = kPCA_PreImage(Beta.T,Alphas,X,C)
+kPCA_PreImage(Beta, Alphas, X_train, C, test_point)
 
 # Show results
-show(test_point)
-show(z)
+#show(test_point)
+#show(z)
+
+
 '''
 # USING SK-LEARN KPCA
 testpoint = X_test[n,:]
