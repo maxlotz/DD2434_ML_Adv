@@ -10,7 +10,6 @@ from scipy import exp
 from scipy.linalg import eigh
 import sys
 
-
 # Author: Sebastian Leborg
 
 datapath = 'datasets/'
@@ -60,18 +59,16 @@ def random_noise(image, prob):
 
     return d
 
-
 def normalize(dataset):  # normalizes data 0 -> 1
     return dataset - np.mean(dataset,0)
 
 # modified from http://sebastianraschka.com/Articles/2014_kernel_pca.html
-def kPCA(dataset, C, n_components=256):
-    '''
+def kPCA(dataset, c, n_components=256):
+    ''' Performs kPCA
     inputs:
         dataset: the dataset, shape (M x N). Each data point is a row, each dimension is a column.
-        C: constant, 2 * (standard deviation**2)
+        c: constant, 2 * (standard deviation**2)
         n_components: number of PCA eigenvectors to be used to reconstruct data
-
     outputs:
         Y = data projected onto normalized eigenvectors
     '''
@@ -80,28 +77,30 @@ def kPCA(dataset, C, n_components=256):
 
     # Calculating the squared Euclidean distances for every pair of points
     sq_dists = pdist(dataset, 'sqeuclidean')
-
+    print sq_dists.shape
     # Converting the pairwise distances into a symmetric MxM matrix.
     mat_sq_dists = squareform(sq_dists)
 
     # Computing the MxM kernel matrix.
-    K = exp(-mat_sq_dists/C) # possibly C*N instead of just C
+    K = exp(-mat_sq_dists/c) # possibly C*N instead of just C
 
     # Centering the symmetric NxN kernel matrix.
     N = K.shape[0]
     one_n = np.ones((N,N)) / N
-    K = K - one_n.dot(K) - K.dot(one_n) + one_n.dot(K).dot(one_n)
-
+    K_ = K - one_n.dot(K) - K.dot(one_n) + one_n.dot(K).dot(one_n)
     # Obtaining eigenvalues in descending order with corresponding eigenvectors
     # This is already normalized
-    eigvals, eigvecs = eigh(K)
+    eigvals, eigvecs = eigh(K_)
 
     # Obtaining the i eigenvectors that corresponds to the i highest eigenvalues.
     eigvecs = np.column_stack((eigvecs[:,-i] for i in range(1,n_components+1)))
 
-    Y = np.dot(K,eigvecs)
-
     return Y, eigvecs
+'''
+def projection(datapoint, eigVectors)
+    # Projection of the data onto the eigenvectors
+    Y = np.dot(K_,eigvecs)
+'''
 
 def PCA(dataset, n_components=256):
     dataset = normalize(dataset)
@@ -111,35 +110,78 @@ def PCA(dataset, n_components=256):
 
     return X_pc # shape: 256 x n_components
 
-def kPCA_PreImage(y,eigVector,dataset,C):
-    # Finds preimage for one piece of data
+def kPCA_PreImage(y,eigVectors,dataset,c):
+    ''' Finds preimage for ONE single data points
+    inputs:
+        y: a single column vector data point projected onto the eigenvectors obtained from kPCA
+        eigVectors: Matrix containing the eigenvectors obtained from kPCA
+        dataset: the dataset, shape (M x N). Each data point is a row, each dimension is a column.
+        c: constant, 2 * (standard deviation**2)
+    outputs:
+        z = preimage, shape (256,)
+    '''
     iters = 1000;
-    N = dataset.shape[0]
-    d = np.max(y.shape);
 
-    gamma = np.dot(eigvecs,y)
-    gamma = gamma[:,None].T
+    gamma = np.dot(eigVectors,y)
+    gamma = gamma[:,None]
 
     z = np.mean(dataset,0)
 
+    num = 0
+    den = 0
     for count in range(iters):
         pre_z = z
-        xx = -((z - dataset)**2)/C
-        xx = np.exp(xx)
-        num = np.dot(gamma,xx)
-        den = xx*dataset
-        z = np.sum(num,0)/np.sum(den,0)
+        for i in range(gamma.shape[0]):
+            num = num + gamma[i]*np.exp(-np.linalg.norm(z-dataset[i,:])**2/c)*dataset[i,:]
+            den = den + gamma[i]*np.exp(-np.linalg.norm(z-dataset[i,:])**2/c)
+            z+= num/den
         convergence = np.linalg.norm(pre_z - z)/np.linalg.norm(z)
-        print convergence
-
+        print "convergence: " + str(convergence)
+        if convergence<0.000000001:
+            break
     return z
 
+# Get dataset
 dataset = fetch_mldata('usps', data_home=datapath)  # Save dataset at path (19.1Mb)
 X, y = dataset.data, dataset.target.astype(np.int)
-C = 1.0
+y -= 1
+X = X[y == 5]
+X = X[:700]
+y = y[:700]
 
-X = X[:300,:]
-Y, eigvecs = kPCA(X,0.5)
-Y_ = Y[0,:]
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.15)
+X_test = gaussian_noise(X_test, 0.4)
+#X_test = gaussian_noise(X_train, 0.4)
 
-z = kPCA_PreImage(Y_,eigvecs,X,C)
+# Set params here
+prob = 0.1 # probability of noise generated
+n_comps = 10 # the number of components
+C = 10 # gaussian kernel param, massively changes convergence time and final result!!!
+n = 1 # pick a specific datapoint
+
+'''
+# Perform kPCA, get the eigenvalues and the projected data, then compute the pre-image for the chosen data point
+Y, eigvecs = kPCA(X,C)
+Y = Y[n,:]
+z = kPCA_PreImage(Y,eigvecs,X,C)
+
+# Shows original image and then calculated preimage
+show(X[n,:])
+show(z)
+'''
+
+
+# USING SK-LEARN KPCA
+testpoint = X_test[n,:]
+testpoint = testpoint[None,:]
+
+kpca = KernelPCA(n_components = 10, kernel="rbf", fit_inverse_transform=True, gamma=C) # Class containg info about the type of kernel, functions etc.
+kpca.fit(X_train) # Creates the kernel based on the training data
+Y = kpca.transform(testpoint) # projects a given point based on the eigenvectors
+image = kpca.inverse_transform(Y) # computes the pre-image of the given point
+
+testpoint.shape = (256,)
+image.shape = (256,)
+
+show(testpoint)
+show(image)
